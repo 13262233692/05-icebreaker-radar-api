@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ice
+      POSTGRES_PASSWORD: ice
+      POSTGRES_DB: iceradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ice -d iceradar"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    environment:
+      TCP_LISTEN_ADDR: ":9101"
+      HTTP_LISTEN_ADDR: ":8080"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_DSN: "postgres://ice:ice@postgres:5432/iceradar?sslmode=disable"
+      ECHO_TTL: "10m"
+    ports:
+      - "8080:8080"
+      - "9101:9101"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
