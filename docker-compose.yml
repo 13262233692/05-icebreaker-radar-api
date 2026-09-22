@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD: radar
+      POSTGRES_DB: iceradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d iceradar"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TCP_ADDR: ":9101"
+      HTTP_ADDR: ":8080"
+      REDIS_URL: "redis://redis:6379/0"
+      POSTGRES_DSN: "postgres://radar:radar@postgres:5432/iceradar?sslmode=disable"
+      ECHO_TTL_SECONDS: "600"
+    ports:
+      - "8080:8080"
+      - "9101:9101"
+
+volumes:
+  pgdata:
